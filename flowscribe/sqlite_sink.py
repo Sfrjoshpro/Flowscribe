@@ -1,41 +1,54 @@
-"""
-SQLite sink for flowscribe events (optional).
-"""
 import sqlite3
-from .core import Event
-from typing import Optional
+from typing import Any, Dict, Optional
 
 class SQLiteSink:
-    def __init__(self, path: str = ".autodev/trace.db"):
-        self.path = path
-        self._init_db()
+	def write(self, event):
+		"""
+		Accepts an Event object and writes it to the database.
+		"""
+		if not hasattr(event, 'event_type') or not hasattr(event, 'to_dict'):
+			raise ValueError("event must have 'event_type' and 'to_dict' method")
+		event_type = event.event_type
+		import json
+		event_data = json.dumps(event.to_dict())
+		self.write_event(event_type, event_data)
+	"""
+	A sink that writes events to a SQLite database.
+	"""
+	def __init__(self, db_path: str = ":memory:"):
+		self.db_path = db_path
+		self.conn: Optional[sqlite3.Connection] = None
+		self._connect()
+		self._ensure_table()
 
-    def _init_db(self):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT,
-                    event_type TEXT,
-                    flow_id TEXT,
-                    step TEXT,
-                    tags TEXT,
-                    evidence TEXT,
-                    data TEXT
-                )
-            ''')
+	def _connect(self):
+		self.conn = sqlite3.connect(self.db_path)
 
-    def write(self, event: Event):
-        with sqlite3.connect(self.path) as conn:
-            conn.execute(
-                "INSERT INTO events (timestamp, event_type, flow_id, step, tags, evidence, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    event.timestamp.isoformat(),
-                    event.event_type,
-                    event.flow_id,
-                    event.step,
-                    ",".join(event.tags),
-                    str(event.evidence),
-                    str(event.data)
-                )
-            )
+	def _ensure_table(self):
+		if self.conn is None:
+			raise RuntimeError("No database connection.")
+		cur = self.conn.cursor()
+		cur.execute('''
+			CREATE TABLE IF NOT EXISTS events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				event_type TEXT,
+				event_data TEXT,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			)
+		''')
+		self.conn.commit()
+
+	def write_event(self, event_type: str, event_data: str):
+		if self.conn is None:
+			raise RuntimeError("No database connection.")
+		cur = self.conn.cursor()
+		cur.execute(
+			"INSERT INTO events (event_type, event_data) VALUES (?, ?)",
+			(event_type, event_data)
+		)
+		self.conn.commit()
+
+	def close(self):
+		if self.conn:
+			self.conn.close()
+			self.conn = None

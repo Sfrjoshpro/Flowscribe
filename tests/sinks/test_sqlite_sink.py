@@ -12,8 +12,21 @@ class TestSQLiteSink(unittest.TestCase):
         sink = SQLiteSink(path)
         event = Event(event_type="metric", flow_id="test/flow", step="metric", evidence={"val": 42})
         sink.write(event)
+        sink.close()  # Close before opening another connection
+
         with sqlite3.connect(path) as conn:
             cur = conn.execute("SELECT event_type FROM events")
             row = cur.fetchone()
             self.assertEqual(row[0], "metric")
-        os.remove(path)
+
+        import time
+        for _ in range(5):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                break
+            except PermissionError:
+                time.sleep(0.2)
+        else:
+            if os.path.exists(path):
+                raise PermissionError(f"Could not delete {path} after multiple attempts")

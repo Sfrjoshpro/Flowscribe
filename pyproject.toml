@@ -22,4 +22,4 @@ Documentation = "https://github.com/yourusername/flowscribe#readme"
 Repository = "https://github.com/yourusername/flowscribe"
 
 [tool.setuptools.packages.find]
-where = ["flowscribe"]
+where = ["."]
