@@ -1,0 +1,51 @@
+version: 1
+enabled: true
+
+profile: critical
+profiles:
+  critical:
+    include_flows: ["data/**", "indicators/**", "orders/**"]
+    exclude_flows: ["**/debug/**"]
+    include_tags: []
+    min_severity: info
+  all:
+    include_flows: ["**"]
+    exclude_flows: []
+    include_tags: []
+    min_severity: debug
+
+sinks:
+  - type: console
+  - type: jsonl
+    path: .autodev/trace.jsonl
+  # - type: sqlite
+  #   path: .autodev/trace.db
+
+artifacts:
+  summary_md: true
+  ask_md: on_failure   # always | on_failure | never
+  per_run_dirs: true   # ./.autodev/runs/<run_id>/* and ./latest symlink
+  trace_tail_events: 50
+
+privacy:
+  redact_keys: ["api_key", "token", "password", "secret", "auth", "cookie"]
+  payload_limit: 2048
+  allow_raw_payloads: false
+
+filters:
+  include_tags: []          # e.g., ["AAPL","phase5","sim"]
+  exclude_tags: []
+  include_flows: []         # extra includes beyond profile
+  exclude_flows: []
+  min_severity: info
+
+performance:
+  latency_buckets_ms: [50, 200, 1000]
+  sla_overrides:
+    "orders/submit": { p95_ms: 1000 }
+    "data/fetch/minute_candles": { p95_ms: 800 }
+
+retention:
+  rotate_trace: true
+  max_trace_bytes: 10485760  # 10 MB
+  keep_runs: 20

@@ -1,0 +1,10 @@
+site_name: flowscribe
+repo_url: https://github.com/yourusername/flowscribe
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Configuration: configuration.md
+  - API Reference: api.md
+  - Contributing: contributing.md
+theme:
+  name: material

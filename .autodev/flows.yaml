@@ -1,0 +1,70 @@
+version: 1
+defaults:
+  tags: ["phase5"]
+  correlation_keys: ["ticker", "date"]
+  on_failure: generate_prompt
+
+flows:
+  - id: "premarket/prepare"
+    enabled: true
+    description: "Validate market day, configs, and data sources."
+    success:
+      criteria:
+        - "market_day = true"
+        - "configs_loaded = true"
+    failure_classes: ["BUSINESS.MARKET_CLOSED", "SYSTEM.CONFIG_MISSING"]
+    code_refs:
+      - "src/lifecycle/premarket_context.py"
+    tags: ["mode", "phase"]
+
+  - id: "data/fetch/minute_candles"
+    enabled: true
+    description: "Fetch minute candles for the active ticker and date."
+    parent: "premarket/prepare"
+    success:
+      criteria:
+        - "rows >= 300"
+        - "time_range covers [09:30,16:00]"
+    failure_classes: ["DATA.EMPTY", "EXTERNAL.4xx", "EXTERNAL.5xx", "CONTRACT.VALIDATION"]
+    correlation_keys: ["ticker", "date", "source"]
+    code_refs:
+      - "src/data/fetcher.py"
+    tags: ["ticker", "mode"]
+
+  - id: "indicators/ema/compute"
+    enabled: true
+    description: "Compute indicator columns required by agents."
+    parent: "data/fetch/minute_candles"
+    success:
+      criteria:
+        - "columns include: ema_9, ema_21, rsi"
+    failure_classes: ["CONTRACT.VALIDATION", "DATA.MISSING_COLUMN"]
+    code_refs:
+      - "features/indicator_utils.py"
+    tags: ["ticker", "mode"]
+
+  - id: "agent/decision/evaluate"
+    enabled: true
+    description: "Produce an action with a confidence score."
+    success:
+      criteria:
+        - "action in {buy, sell, hold}"
+        - "score >= threshold"
+    failure_classes: ["BUSINESS.NO_ACTION", "DATA.BAD_STATE"]
+    code_refs:
+      - "src/agent/decision.py"
+    tags: ["ticker", "mode"]
+
+  - id: "orders/submit"
+    enabled: true
+    description: "Submit order to broker and await ack."
+    parent: "agent/decision/evaluate"
+    success:
+      criteria:
+        - "ack received with order_id"
+    failure_classes: ["EXTERNAL.TIMEOUT", "EXTERNAL.REJECTED"]
+    sla:
+      p95_ms: 1000
+    code_refs:
+      - "src/orders/broker_x.py"
+    tags: ["ticker", "mode"]
