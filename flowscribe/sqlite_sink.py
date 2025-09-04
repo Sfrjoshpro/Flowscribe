@@ -28,27 +28,36 @@ class SQLiteSink:
 		if self.conn is None:
 			raise RuntimeError("No database connection.")
 		cur = self.conn.cursor()
-		cur.execute('''
-			CREATE TABLE IF NOT EXISTS events (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				event_type TEXT,
-				event_data TEXT,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-			)
-		''')
-		self.conn.commit()
+		try:
+			cur.execute('''
+				CREATE TABLE IF NOT EXISTS events (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					event_type TEXT,
+					event_data TEXT,
+					created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				)
+			''')
+			self.conn.commit()
+		finally:
+			cur.close()
 
 	def write_event(self, event_type: str, event_data: str):
 		if self.conn is None:
 			raise RuntimeError("No database connection.")
 		cur = self.conn.cursor()
-		cur.execute(
-			"INSERT INTO events (event_type, event_data) VALUES (?, ?)",
-			(event_type, event_data)
-		)
-		self.conn.commit()
+		try:
+			cur.execute(
+				"INSERT INTO events (event_type, event_data) VALUES (?, ?)",
+				(event_type, event_data)
+			)
+			self.conn.commit()
+		finally:
+			cur.close()
 
 	def close(self):
 		if self.conn:
 			self.conn.close()
 			self.conn = None
+			# Help release file handle on Windows
+			import gc
+			gc.collect()
