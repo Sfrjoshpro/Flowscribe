@@ -15,8 +15,14 @@ class SQLiteSink:
 	"""
 	A sink that writes events to a SQLite database.
 	"""
-	def __init__(self, db_path: str = ":memory:"):
-		self.db_path = db_path
+	def __init__(self, db_path: str = None, run_dir: str = None, filename: str = "trace.db"):
+		import os
+		if run_dir is not None:
+			self.db_path = os.path.join(run_dir, filename)
+		elif db_path is not None:
+			self.db_path = db_path
+		else:
+			self.db_path = ":memory:"
 		self.conn: Optional[sqlite3.Connection] = None
 		self._connect()
 		self._ensure_table()

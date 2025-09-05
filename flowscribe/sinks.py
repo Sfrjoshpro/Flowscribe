@@ -1,8 +1,14 @@
 import json
 
 class JSONLSink:
-	def __init__(self, path):
-		self.path = path
+	def __init__(self, path=None, run_dir=None, filename="trace.jsonl"):
+		import os
+		if run_dir is not None:
+			self.path = os.path.join(run_dir, filename)
+		elif path is not None:
+			self.path = path
+		else:
+			self.path = "trace.jsonl"
 
 	def write(self, event):
 		# Try to use to_dict if available, else fallback to __dict__
